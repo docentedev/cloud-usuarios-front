@@ -1,62 +1,70 @@
 import { useAuth } from "react-oidc-context";
-import {
-  cognitoAuthConfig,
-  cognitoDomain,
-  logoutUri,
-} from "./authConfig";
-import "./App.css";
+import { Route, Switch, Link } from "wouter";
+import { SearchX } from "lucide-react";
+import { AppLayout } from "./components/layout/AppLayout";
+import { Card } from "./components/ui/Card";
+import { EmptyState } from "./components/ui/EmptyState";
+import { buttonStyles } from "./lib/ui";
+import { LoginPage } from "./pages/LoginPage";
+import { OverviewPage } from "./pages/OverviewPage";
+import { UserCreatePage } from "./pages/UserCreatePage";
+import { UserDetailPage } from "./pages/UserDetailPage";
+import { UsersPage } from "./pages/UsersPage";
+
+function LoadingScreen() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+      <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+        <span className="size-4 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600 dark:border-slate-700 dark:border-t-indigo-400" />
+        Cargando sesión...
+      </div>
+    </div>
+  );
+}
+
+function NotFoundPage() {
+  return (
+    <Card>
+      <EmptyState
+        icon={<SearchX className="size-6" />}
+        title="Página no encontrada"
+        description="La ruta que intentaste abrir no existe en el panel."
+        action={
+          <Link
+            href="/"
+            className={buttonStyles({ variant: "primary", size: "md" })}
+          >
+            Ir al resumen
+          </Link>
+        }
+      />
+    </Card>
+  );
+}
 
 function App() {
   const auth = useAuth();
 
-  const signOutRedirect = async () => {
-    // 1) Borra los tokens locales (sessionStorage/localStorage).
-    //    Sin esto, al volver de Cognito la app te seguiría viendo "autenticado".
-    await auth.removeUser();
-
-    // 2) Cierra la sesión del Hosted UI de Cognito.
-    if (!cognitoDomain) {
-      console.error(
-        "Falta VITE_COGNITO_DOMAIN (https://<prefijo>.auth.<region>.amazoncognito.com). " +
-          "Solo se cerró la sesión local.",
-      );
-      return;
-    }
-
-    const params = new URLSearchParams({
-      client_id: cognitoAuthConfig.client_id,
-      logout_uri: logoutUri,
-    });
-
-    window.location.href = `${cognitoDomain}/logout?${params.toString()}`;
-  };
-
   if (auth.isLoading) {
-    return <div>Loading...</div>;
+    return <LoadingScreen />;
   }
 
-  if (auth.error) {
-    return <div>Encountering error... {auth.error.message}</div>;
-  }
-
-  if (auth.isAuthenticated) {
-    return (
-      <div>
-        <pre> Hello: {auth.user?.profile.email} </pre>
-        <pre> ID Token: {auth.user?.id_token} </pre>
-        <pre> Access Token: {auth.user?.access_token} </pre>
-        <pre> Refresh Token: {auth.user?.refresh_token} </pre>
-
-        <button onClick={() => void signOutRedirect()}>Sign out</button>
-      </div>
-    );
+  if (!auth.isAuthenticated) {
+    return <LoginPage />;
   }
 
   return (
-    <div>
-      <button onClick={() => void auth.signinRedirect()}>Sign in</button>
-      <button onClick={() => void signOutRedirect()}>Sign out</button>
-    </div>
+    <AppLayout>
+      <Switch>
+        <Route path="/" component={OverviewPage} />
+        <Route path="/users" component={UsersPage} />
+        <Route path="/user/create" component={UserCreatePage} />
+        <Route path="/user/detail/:id">
+          {(params) => <UserDetailPage id={params.id} />}
+        </Route>
+        <Route component={NotFoundPage} />
+      </Switch>
+    </AppLayout>
   );
 }
 
