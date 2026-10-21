@@ -1,13 +1,20 @@
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, SlidersHorizontal } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CircleAlert,
+  Plus,
+  RefreshCw,
+  SlidersHorizontal,
+} from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
+import { mapUsuario } from "../client/get-api-usuarios/mapper";
+import { useGetUsuarios } from "../client/get-api-usuarios/useGetApiUsuarios";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { Modal } from "../components/ui/Modal";
 import { PageHeader } from "../components/ui/PageHeader";
 import { SearchField } from "../components/ui/SearchField";
 import { UserTable } from "../components/users/UserTable";
-import { useUsers } from "../hooks/useUsers";
 import { buttonStyles, filterSelectStyles } from "../lib/ui";
 import {
   ROLE_LABELS,
@@ -15,15 +22,39 @@ import {
   USER_ROLES,
   USER_STATUSES,
 } from "../types/user";
-import type { User, UserRole, UserStatus } from "../types/user";
+import type { UserRole, UserStatus } from "../types/user";
 
 const PAGE_SIZE = 6;
 
 type RoleFilter = "all" | UserRole;
 type StatusFilter = "all" | UserStatus;
 
+function LoadingRows() {
+  return (
+    <div
+      aria-busy="true"
+      aria-live="polite"
+      className="divide-y divide-slate-100 dark:divide-slate-800"
+    >
+      <span className="sr-only">Cargando usuarios...</span>
+      {Array.from({ length: 5 }).map((_, index) => (
+        <div key={index} className="flex items-center gap-3 px-5 py-4">
+          <div className="size-10 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-40 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+            <div className="h-3 w-56 animate-pulse rounded bg-slate-100 dark:bg-slate-800/60" />
+          </div>
+          <div className="hidden h-6 w-20 animate-pulse rounded-full bg-slate-100 sm:block dark:bg-slate-800/60" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function UsersPage() {
-  const { users, deleteUser } = useUsers();
+  const { data: usuarios, error, loading, refetch } = useGetUsuarios();
+  console.log("Usuarios:", usuarios);
+
   const searchString = useSearch();
   const [, navigate] = useLocation();
   const query = useMemo(
@@ -34,7 +65,6 @@ export function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [page, setPage] = useState(1);
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const updateQuery = (value: string) => {
     setPage(1);
@@ -53,6 +83,11 @@ export function UsersPage() {
     setPage(1);
     setStatusFilter(value);
   };
+
+  const users = useMemo(
+    () => (usuarios ?? []).map(mapUsuario),
+    [usuarios],
+  );
 
   const filteredUsers = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -80,6 +115,7 @@ export function UsersPage() {
   );
   const hasFilters =
     query.trim() !== "" || roleFilter !== "all" || statusFilter !== "all";
+  const isInitialLoading = loading && !usuarios;
 
   const clearFilters = () => {
     setPage(1);
@@ -88,11 +124,56 @@ export function UsersPage() {
     navigate("/users", { replace: true });
   };
 
-  const handleConfirmDelete = () => {
-    if (!userToDelete) return;
+  const renderContent = () => {
+    if (error) {
+      return (
+        <div
+          role="alert"
+          className="flex flex-col gap-4 px-5 py-8 sm:flex-row sm:items-center"
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400">
+            <CircleAlert className="size-5" />
+          </span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              No se pudieron cargar los usuarios
+            </p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {error.message}
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={refetch}>
+            <RefreshCw className="size-4" />
+            Reintentar
+          </Button>
+        </div>
+      );
+    }
 
-    deleteUser(userToDelete.id);
-    setUserToDelete(null);
+    if (isInitialLoading) {
+      return <LoadingRows />;
+    }
+
+    return (
+      <UserTable
+        users={visibleUsers}
+        emptyAction={
+          hasFilters ? (
+            <Button variant="secondary" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
+          ) : (
+            <Link
+              href="/user/create"
+              className={buttonStyles({ variant: "primary", size: "md" })}
+            >
+              <Plus className="size-4" />
+              Crear el primer usuario
+            </Link>
+          )
+        }
+      />
+    );
   };
 
   return (
@@ -173,8 +254,11 @@ export function UsersPage() {
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
           <div>
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {filteredUsers.length}{" "}
-              {filteredUsers.length === 1 ? "usuario" : "usuarios"}
+              {isInitialLoading
+                ? "Cargando usuarios..."
+                : `${filteredUsers.length} ${
+                    filteredUsers.length === 1 ? "usuario" : "usuarios"
+                  }`}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {hasFilters
@@ -187,27 +271,9 @@ export function UsersPage() {
           </span>
         </div>
 
-        <UserTable
-          users={visibleUsers}
-          onRequestDelete={setUserToDelete}
-          emptyAction={
-            hasFilters ? (
-              <Button variant="secondary" onClick={clearFilters}>
-                Limpiar filtros
-              </Button>
-            ) : (
-              <Link
-                href="/user/create"
-                className={buttonStyles({ variant: "primary", size: "md" })}
-              >
-                <Plus className="size-4" />
-                Crear el primer usuario
-              </Link>
-            )
-          }
-        />
+        {renderContent()}
 
-        {filteredUsers.length > PAGE_SIZE ? (
+        {!error && filteredUsers.length > PAGE_SIZE ? (
           <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3.5 dark:border-slate-800">
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–
@@ -239,27 +305,6 @@ export function UsersPage() {
           </div>
         ) : null}
       </Card>
-
-      <Modal
-        open={userToDelete !== null}
-        title="Eliminar usuario"
-        description={
-          userToDelete
-            ? `¿Seguro que quieres eliminar a ${userToDelete.name}? Esta acción no se puede deshacer.`
-            : undefined
-        }
-        onClose={() => setUserToDelete(null)}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setUserToDelete(null)}>
-              Cancelar
-            </Button>
-            <Button variant="danger" onClick={handleConfirmDelete}>
-              Eliminar usuario
-            </Button>
-          </>
-        }
-      />
     </div>
   );
 }

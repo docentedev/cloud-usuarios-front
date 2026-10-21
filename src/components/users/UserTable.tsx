@@ -11,7 +11,7 @@ import { EmptyState } from "../ui/EmptyState";
 
 interface UserTableProps {
   users: User[];
-  onRequestDelete: (user: User) => void;
+  onRequestDelete?: (user: User) => void;
   emptyAction?: ReactNode;
 }
 
@@ -116,18 +116,20 @@ export function UserTable({
                     >
                       <Pencil className="size-4" />
                     </Link>
-                    <button
-                      type="button"
-                      onClick={() => onRequestDelete(user)}
-                      aria-label={`Eliminar ${user.name}`}
-                      title="Eliminar"
-                      className={cn(
-                        buttonStyles({ variant: "ghost", size: "sm" }),
-                        "px-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:text-rose-400 dark:hover:bg-rose-500/10",
-                      )}
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
+                    {onRequestDelete ? (
+                      <button
+                        type="button"
+                        onClick={() => onRequestDelete(user)}
+                        aria-label={`Eliminar ${user.name}`}
+                        title="Eliminar"
+                        className={cn(
+                          buttonStyles({ variant: "ghost", size: "sm" }),
+                          "px-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:text-rose-400 dark:hover:bg-rose-500/10",
+                        )}
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    ) : null}
                   </div>
                 </td>
               </tr>
@@ -174,17 +176,19 @@ export function UserTable({
                     <Pencil className="size-3.5" />
                     Editar
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => onRequestDelete(user)}
-                    className={cn(
-                      buttonStyles({ variant: "ghost", size: "sm" }),
-                      "ml-auto text-rose-600 dark:text-rose-400",
-                    )}
-                  >
-                    <Trash2 className="size-4" />
-                    <span className="sr-only">Eliminar {user.name}</span>
-                  </button>
+                  {onRequestDelete ? (
+                    <button
+                      type="button"
+                      onClick={() => onRequestDelete(user)}
+                      className={cn(
+                        buttonStyles({ variant: "ghost", size: "sm" }),
+                        "ml-auto text-rose-600 dark:text-rose-400",
+                      )}
+                    >
+                      <Trash2 className="size-4" />
+                      <span className="sr-only">Eliminar {user.name}</span>
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
